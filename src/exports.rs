@@ -8,7 +8,7 @@
 use xladd::variant::Variant;
 use xladd::xlcall::LPXLOPER12;
 use xladd::registrator::Reg;
-use process::{start_ghci, raw_command, raw_read, raw_write, raw_peek, raw_return};
+use process::{start_ghci, raw_command, raw_read, raw_write, raw_wait_read, raw_return};
 
 /// Shows version string. Note that in the Excel function wizard, this shows
 /// as requiring one unnamed parameter. This is a longstanding Excel bug.
@@ -39,6 +39,13 @@ pub extern "stdcall" fn hkRawRead() -> LPXLOPER12 {
 }
 
 #[no_mangle]
+pub extern "stdcall" fn hkRawWaitRead() -> LPXLOPER12 {
+    let result = raw_wait_read();
+    let box_result = Box::new(Variant::from_str(&result));
+    Box::into_raw(box_result) as LPXLOPER12
+}
+
+#[no_mangle]
 pub extern "stdcall" fn hkRawWrite(xl_command: LPXLOPER12) -> LPXLOPER12 {
     let result;
     if let Some(command) = Variant::from_xloper(xl_command).as_string() {
@@ -59,13 +66,6 @@ pub extern "stdcall" fn hkRawReturn() -> LPXLOPER12 {
 }
 
 #[no_mangle]
-pub extern "stdcall" fn hkRawPeek() -> LPXLOPER12 {
-    let result = raw_peek();
-    let box_result = Box::new(Variant::from_str(&result));
-    Box::into_raw(box_result) as LPXLOPER12
-}
-
-#[no_mangle]
 pub extern "stdcall" fn xlAutoOpen() -> i32 {
 
     start_ghci();   // start the process hosting Haskell
@@ -73,10 +73,10 @@ pub extern "stdcall" fn xlAutoOpen() -> i32 {
     let r = Reg::new();
     r.add("hkVersion", "Q$", "", "Hasxcel", "Displays addin version number as text.", &[]);
     r.add("hkRaw", "QQ$", "Command", "Hasxcel", "Submits raw text into GHCI and returns the result", &[]);
-    r.add("hkRawRead", "Q$", "", "Hasxcel", "Waits for and returns raw text from GHCI", &[]);
+    r.add("hkRawRead", "Q$", "", "Hasxcel", "Returns any raw text that is ready from GHCI", &[]);
     r.add("hkRawWrite", "QQ$", "Command", "Hasxcel", "Submits raw text into GHCI and returns the result", &[]);
     r.add("hkRawReturn", "Q$", "", "Hasxcel", "Submits a raw carriage return into GHCI", &[]);
-    r.add("hkRawPeek", "Q$", "", "Hasxcel", "If raw text is available from GHCI, returns it", &[]);
+    r.add("hkRawWaitRead", "Q$", "", "Hasxcel", "Waits for then returns raw text from GHCI", &[]);
 
     1
 }

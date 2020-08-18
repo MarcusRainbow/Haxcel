@@ -11,7 +11,7 @@ use winapi::um::debugapi::OutputDebugStringA;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::winnt::HANDLE;
 use std::ffi::CString;
-use std::{mem, ptr};
+use std::{mem, ptr, thread, time};
 
 static mut GHCI_STDIN : HANDLE = NULL;
 static mut GHCI_STDOUT : HANDLE = NULL;
@@ -149,24 +149,56 @@ fn error_message(message: &str) -> String {
 }
 
 pub fn raw_command(command: &str) -> String {
+
     // read whatever was previously in the GHCI stdout pipe
-    // if let Some(prev) = read_pipe() {
-    //     log_extra_output(&prev);
-    // } else {
-    //     return error_message("Error: Cannot read from GHCI pipe")
-    // }
-
-    // write the command into the GHCI stdin pipe
-    if ! write_pipe(command) {
-        return error_message("Error: Cannot write to GHCI pipe")
-    }
-
-    // now read in from the GHCI stdout pipe
-    if let Some(response) = read_pipe() {
-        return response;
+    if let Some(prev) = read_pipe_nonblocking() {
+        log(&prev);
     } else {
         return error_message("Error: Cannot read from GHCI pipe")
     }
+
+    // write the command into the GHCI stdin pipe, followed by a carriage return
+    if ! write_pipe(command) || ! write_pipe("\n") {
+        return error_message("Error: Cannot write to GHCI pipe")
+    }
+
+    // wait a short time for GHCI to respond
+    let short_wait = time::Duration::from_millis(100);
+    thread::sleep(short_wait);
+
+    if let Some(response) = read_pipe_nonblocking() {
+
+        if response.ends_with("> ") {
+            if let Some(pos) = response.rfind("\n") {
+                // if there is a response followed by a prompt, return the response
+                return response[..pos].to_string()
+            } else {
+                // if there is just a prompt, return the original command (e.g. a definition) 
+                return command.to_string()
+            }
+        } else {
+            // if there is no prompt, return whatever we have got
+            return response.to_string()
+        }
+    } else {
+        return error_message("Error: Cannot read from GHCI pipe")
+    }
+    
+    // let mut results = "".to_string();
+    // loop {
+    //     if let Some(response) = read_pipe() {
+    //         if response.ends_with("> ") {
+    //             if let Some(pos) = response.rfind("\n") {
+    //                 results += &response[..pos];
+    //             }
+    //             return results;
+    //         } else {
+    //             results += &response;
+    //         }
+    //     } else {
+    //         return error_message("Error: Cannot read from GHCI pipe")
+    //     }
+    // }
 }
 
 pub fn raw_write(message: &str) -> String {
@@ -185,7 +217,7 @@ pub fn raw_return() -> String {
     return "OK".to_string()
 }
 
-pub fn raw_read() -> String {
+pub fn raw_wait_read() -> String {
     if let Some(response) = read_pipe() {
         return response;
     } else {
@@ -193,8 +225,8 @@ pub fn raw_read() -> String {
     }
 }
 
-pub fn raw_peek() -> String {
-    if let Some(response) = peek_pipe() {
+pub fn raw_read() -> String {
+    if let Some(response) = read_pipe_nonblocking() {
         return response;
     } else {
         return error_message("Error: Cannot peek from GHCI pipe")
@@ -230,25 +262,38 @@ fn read_pipe() -> Option<String> {
     return Some(cstr_result.into_string().unwrap());
 }
 
-fn peek_pipe() -> Option<String> {
-    let buffer_max = 1000;
+fn read_pipe_nonblocking() -> Option<String> {
+
+    // do nothing if there is nothing in the pipe. Just return None.
+    let mut bytes_avail : DWORD = 0;
+    if unsafe { PeekNamedPipe(
+            GHCI_STDOUT, 
+            NULL, 
+            0,
+            NULL as LPDWORD,
+            &mut bytes_avail,
+            NULL as LPDWORD) != TRUE as BOOL } {
+        log(&error_message("Error: PeekNamedPipe failed"));
+        return None;
+    }
+    
+    if bytes_avail == 0 {
+        return Some("".to_string());
+    }
+
+    let buffer_max = bytes_avail as usize;
     let mut read_buffer = Vec::<u8>::new();
     let mut bytes_read : DWORD = 0;
-    let mut bytes_avail : DWORD = 0;
-    let mut bytes_left : DWORD = 0;
     read_buffer.resize(buffer_max, 0); 
-    if unsafe { PeekNamedPipe(
+    if unsafe { ReadFile(
             GHCI_STDOUT, 
             read_buffer.as_mut_ptr() as LPVOID, 
             buffer_max as DWORD,
             &mut bytes_read,
-            &mut bytes_avail,
-            &mut bytes_left) != TRUE as BOOL } {
-        log(&error_message("Error: PeekNamedPipe failed"));
+            NULL as LPOVERLAPPED) != TRUE as BOOL } {
+        log(&error_message("Error: ReadFile failed"));
         return None;
     }
-
-    log(&format!("PeekNamedPipe: bytes_read={} bytes_avail={} bytes_left={}", bytes_read, bytes_avail, bytes_left));
 
     let cstr_result = unsafe { CString::from_vec_unchecked(read_buffer) };
     return Some(cstr_result.into_string().unwrap());
