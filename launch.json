@@ -1,0 +1,32 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Windbg"
+            ,"type": "windbg"
+            ,"request": "launch"
+            ,"target": "C:\\Program Files\\Microsoft Office\\root\\Office16\\Excel.exe"
+            ,"verbosity": "debug"
+            ,"windbgpath": "C:/Program Files (x86)/Windows Kits/10/Debuggers/x64/dbgeng.dll"
+            ,"workingDir": "${workspaceRoot}"
+            ,"sources": [ 
+                "${workspaceRoot}/src"
+                //,"%RUST_SRC_PATH%" 
+                ]
+        },
+        {
+            "name": "(Windows) Launch",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "C:\\Program Files\\Microsoft Office\\root\\Office16\\Excel.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false
+        }
+    ]
+}

@@ -1,0 +1,17 @@
+[package]
+name = "hasxcel"
+version = "0.1.0"
+authors = ["Marcus Rainbow"]
+license = "MIT"
+description = "Hasxcel: Excel gateway to Haskell"
+
+[dependencies]
+winapi = { version = "0.3.5", features = [
+    "winuser", "libloaderapi", "debugapi", "processthreadsapi", "handleapi", 
+    "namedpipeapi", "winbase", "fileapi", "errhandlingapi"
+    ] }
+xladd = "0.1.0"
+
+[lib]
+name = "hasxcel"
+crate-type = ["cdylib"]
