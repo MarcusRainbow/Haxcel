@@ -8,9 +8,10 @@ description = "Hasxcel: Excel gateway to Haskell"
 [dependencies]
 winapi = { version = "0.3.5", features = [
     "winuser", "libloaderapi", "debugapi", "processthreadsapi", "handleapi", 
-    "namedpipeapi", "winbase", "fileapi", "errhandlingapi"
+    "namedpipeapi", "winbase", "fileapi", "errhandlingapi", "wincon",
     ] }
-xladd = "0.1.0"
+#xladd = "0.1.2"
+xladd = { path = "../xladd-master" }
 
 [lib]
 name = "hasxcel"

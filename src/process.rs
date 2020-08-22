@@ -3,10 +3,11 @@ use winapi::shared::minwindef::{BOOL, DWORD, LPCVOID, LPDWORD, LPVOID};
 use winapi::um::processthreadsapi::{CreateProcessA, STARTUPINFOA, PROCESS_INFORMATION};
 use winapi::um::handleapi::{CloseHandle, SetHandleInformation};
 use winapi::um::namedpipeapi::{CreatePipe, PeekNamedPipe};
+use winapi::um::wincon::GenerateConsoleCtrlEvent;
 // use winapi::um::winbase::handle_flag_inherit;
 use winapi::um::winbase::STARTF_USESTDHANDLES;
 use winapi::um::minwinbase::{SECURITY_ATTRIBUTES, LPOVERLAPPED};
-use winapi::shared::ntdef::{NULL, TRUE, FALSE};
+use winapi::shared::ntdef::{NULL, TRUE};
 use winapi::um::debugapi::OutputDebugStringA;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::winnt::HANDLE;
@@ -16,6 +17,7 @@ use std::{mem, ptr, thread, time};
 static mut GHCI_STDIN : HANDLE = NULL;
 static mut GHCI_STDOUT : HANDLE = NULL;
 static mut GHCI_STDERR : HANDLE = NULL;
+static mut LOGGING : bool = false;
 
 pub fn start_ghci() {
 
@@ -133,17 +135,44 @@ pub fn start_ghci() {
     }
 }
 
+fn stdout_pipe() -> HANDLE {
+    unsafe { GHCI_STDOUT }
+}
+
+fn stderr_pipe() -> HANDLE {
+    unsafe { GHCI_STDERR }
+}
+
+fn stdin_pipe() -> HANDLE {
+    unsafe { GHCI_STDIN }
+}
+
 fn error_exit(message: &str) {
     let cstr = CString::new(error_message(message)).unwrap();
     unsafe { OutputDebugStringA(cstr.as_ptr()) };
 }
 
-fn log(message: &str) {
+pub fn logging(on: bool) {
+    unsafe { LOGGING = on };
+    if on {
+        log("Turning logging on");
+    } else {
+        log("Turning logging off")
+    }
+}
+
+pub fn log(message: &str) {
+    if unsafe { LOGGING } {
+        always_log(message);
+    }
+}
+
+fn always_log(message: &str) {
     let cstr = CString::new(message).unwrap();
     unsafe { OutputDebugStringA(cstr.as_ptr()) };
 }
 
-fn error_message(message: &str) -> String {
+pub fn error_message(message: &str) -> String {
     let last_error = unsafe { GetLastError() };
     format!("{}: {}", message, last_error)
 }
@@ -151,7 +180,7 @@ fn error_message(message: &str) -> String {
 pub fn raw_command(command: &str) -> String {
 
     // read whatever was previously in the GHCI stdout pipe
-    if let Some(prev) = read_pipe_nonblocking() {
+    if let Some(prev) = read_pipe_nonblocking(stdout_pipe()) {
         log(&prev);
     } else {
         return error_message("Error: Cannot read from GHCI pipe")
@@ -162,43 +191,59 @@ pub fn raw_command(command: &str) -> String {
         return error_message("Error: Cannot write to GHCI pipe")
     }
 
-    // wait a short time for GHCI to respond
-    let short_wait = time::Duration::from_millis(100);
-    thread::sleep(short_wait);
-
-    if let Some(response) = read_pipe_nonblocking() {
-
-        if response.ends_with("> ") {
-            if let Some(pos) = response.rfind("\n") {
-                // if there is a response followed by a prompt, return the response
-                return response[..pos].to_string()
-            } else {
-                // if there is just a prompt, return the original command (e.g. a definition) 
-                return command.to_string()
-            }
-        } else {
-            // if there is no prompt, return whatever we have got
-            return response.to_string()
-        }
+    if let Some(result) = read_full_response() {
+        return result
     } else {
         return error_message("Error: Cannot read from GHCI pipe")
     }
-    
-    // let mut results = "".to_string();
-    // loop {
-    //     if let Some(response) = read_pipe() {
-    //         if response.ends_with("> ") {
-    //             if let Some(pos) = response.rfind("\n") {
-    //                 results += &response[..pos];
-    //             }
-    //             return results;
-    //         } else {
-    //             results += &response;
-    //         }
-    //     } else {
-    //         return error_message("Error: Cannot read from GHCI pipe")
-    //     }
-    // }
+}
+
+pub fn read_full_response() -> Option<String> {
+    // wait a short time for GHCI to respond, then longer periods
+    let short_wait = time::Duration::from_millis(10);
+    let long_wait = time::Duration::from_millis(200);
+    let mut timeout = 10; // times long_wait
+    thread::sleep(short_wait);
+
+    let mut result = String::new();
+    loop {
+        if let Some(response) = read_pipe_nonblocking(stdout_pipe()) {
+            log(&format!("read: {}", response));
+
+            if response.ends_with("> ") {
+                if let Some(pos) = response.rfind("\n") {
+                    // if there is a response followed by a prompt, return the response
+                    result += &response[..pos].to_string()
+                }
+                // we have seen a prompt, so ok to exit the loop
+                break;
+            } else if timeout > 0 {
+                // if there is no prompt, then keep waiting
+                result += &response;
+                thread::sleep(long_wait);
+                timeout -= 1;
+            } else {
+                // timed out. We don't want to just return anyway. We need to get
+                // the GHCI process back to its command prompt somehow.
+                // TODO: we cannot simply send a SIGINT like this. See https://social.msdn.microsoft.com/Forums/en-US/dc9586ab-1ee8-41aa-a775-cf4828ac1239/how-to-send-ctrlc-signal-to-detached-commandline-process?forum=windowsgeneraldevelopmentissues
+                if unsafe { GenerateConsoleCtrlEvent(0, 0) } == 0 {
+                    always_log(&error_message("Error: Unable to send Ctrl+C after timeout"));
+                    return None
+                }
+                timeout = 10;
+            }
+        }
+    }
+
+    // We have seen the command prompt. Check whether there was
+    // anything in stderr, and if so add it to whatever was in stdout
+    // first see if there is anything in stderr
+    if let Some(err_response) = read_pipe_nonblocking(stderr_pipe()) {
+        log(&format!("stderr: {}", err_response));
+        result += &err_response;
+    }
+
+    return Some(result)
 }
 
 pub fn raw_write(message: &str) -> String {
@@ -218,7 +263,8 @@ pub fn raw_return() -> String {
 }
 
 pub fn raw_wait_read() -> String {
-    if let Some(response) = read_pipe() {
+    if let Some(response) = read_pipe(stdout_pipe()) {
+        log(&format!("wait then read: {}", response));
         return response;
     } else {
         return error_message("Error: Cannot read from GHCI pipe")
@@ -226,31 +272,42 @@ pub fn raw_wait_read() -> String {
 }
 
 pub fn raw_read() -> String {
-    if let Some(response) = read_pipe_nonblocking() {
+    if let Some(response) = read_pipe_nonblocking(stdout_pipe()) {
+        log(&format!("read: {}", response));
         return response;
     } else {
-        return error_message("Error: Cannot peek from GHCI pipe")
+        return error_message("Error: Cannot read from GHCI pipe")
     }
 }
 
-fn write_pipe(message: &str) -> bool {
+pub fn raw_error() -> String {
+    if let Some(response) = read_pipe_nonblocking(stderr_pipe()) {
+        log(&format!("error: {}", response));
+        return response;
+    } else {
+        return error_message("Error: Cannot read from GHCI stderr pipe")
+    }
+}
+
+pub fn write_pipe(message: &str) -> bool {
+    log(&format!("write: {}", message));
     let buffer = CString::new(message).unwrap();
     let raw_buffer = buffer.as_bytes();
     return unsafe { WriteFile(
-            GHCI_STDIN, 
+            stdin_pipe(), 
             raw_buffer.as_ptr() as LPCVOID, 
             raw_buffer.len() as DWORD,
             NULL as LPDWORD,
             NULL as LPOVERLAPPED) == TRUE as BOOL }
 }
 
-fn read_pipe() -> Option<String> {
+fn read_pipe(pipe: HANDLE) -> Option<String> {
     let buffer_max = 1000;
     let mut read_buffer = Vec::<u8>::new();
     let mut bytes_read : DWORD = 0;
     read_buffer.resize(buffer_max, 0); 
     if unsafe { ReadFile(
-            GHCI_STDOUT, 
+            pipe, 
             read_buffer.as_mut_ptr() as LPVOID, 
             buffer_max as DWORD,
             &mut bytes_read,
@@ -262,18 +319,18 @@ fn read_pipe() -> Option<String> {
     return Some(cstr_result.into_string().unwrap());
 }
 
-fn read_pipe_nonblocking() -> Option<String> {
+fn read_pipe_nonblocking(pipe: HANDLE) -> Option<String> {
 
     // do nothing if there is nothing in the pipe. Just return None.
     let mut bytes_avail : DWORD = 0;
     if unsafe { PeekNamedPipe(
-            GHCI_STDOUT, 
+            pipe, 
             NULL, 
             0,
             NULL as LPDWORD,
             &mut bytes_avail,
             NULL as LPDWORD) != TRUE as BOOL } {
-        log(&error_message("Error: PeekNamedPipe failed"));
+        always_log(&error_message("Error: PeekNamedPipe failed"));
         return None;
     }
     
@@ -286,12 +343,12 @@ fn read_pipe_nonblocking() -> Option<String> {
     let mut bytes_read : DWORD = 0;
     read_buffer.resize(buffer_max, 0); 
     if unsafe { ReadFile(
-            GHCI_STDOUT, 
+            pipe, 
             read_buffer.as_mut_ptr() as LPVOID, 
             buffer_max as DWORD,
             &mut bytes_read,
             NULL as LPOVERLAPPED) != TRUE as BOOL } {
-        log(&error_message("Error: ReadFile failed"));
+        always_log(&error_message("Error: ReadFile failed"));
         return None;
     }
 

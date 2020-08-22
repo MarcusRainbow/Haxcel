@@ -1,5 +1,6 @@
 pub mod exports;
 mod process;
+mod haskell;
 
 extern crate xladd;
 extern crate winapi;
