@@ -18,7 +18,7 @@ static mut GHCI_STDIN : HANDLE = NULL;
 static mut GHCI_STDOUT : HANDLE = NULL;
 static mut GHCI_STDERR : HANDLE = NULL;
 static mut GHCI_INITIAL_RESPONSE : Option<String> = None;
-static mut LOGGING : bool = false;
+static mut LOGGING : bool = true;
 
 pub fn start_ghci() {
 
@@ -136,7 +136,7 @@ pub fn start_ghci() {
 
         // pull as much as we can from GHCI. This should be just version info
         // that GHCI outputs at startup.
-        GHCI_INITIAL_RESPONSE = read_full_response();
+        GHCI_INITIAL_RESPONSE = read_full_response_with_timeout(1000);
     }
 }
 
@@ -209,10 +209,15 @@ pub fn raw_command(command: &str) -> String {
 }
 
 pub fn read_full_response() -> Option<String> {
+    read_full_response_with_timeout(0)
+}
+
+pub fn read_full_response_with_timeout(timeout_millis : i64) -> Option<String> {
     // wait a short time for GHCI to respond, then longer periods
     let short_wait = time::Duration::from_millis(10);
     let long_wait = time::Duration::from_millis(200);
-    let mut timeout = 10; // times long_wait
+    let timeout_delta = if timeout_millis > 0 { 200 } else { 0 };
+    let mut timeout = timeout_millis;
     thread::sleep(short_wait);
 
     let mut result = String::new();
@@ -227,11 +232,11 @@ pub fn read_full_response() -> Option<String> {
                 }
                 // we have seen a prompt, so ok to exit the loop
                 break;
-            } else if timeout > 0 {
+            } else if timeout >= 0 {
                 // if there is no prompt, then keep waiting
                 result += &response;
                 thread::sleep(long_wait);
-                timeout -= 1;
+                timeout -= timeout_delta;
             } else {
                 // timed out. We don't want to just return anyway. We need to get
                 // the GHCI process back to its command prompt somehow.
@@ -240,7 +245,7 @@ pub fn read_full_response() -> Option<String> {
                     always_log(&error_message("Error: Unable to send Ctrl+C after timeout"));
                     return None
                 }
-                timeout = 10;
+                timeout = timeout_millis;
             }
         }
     }

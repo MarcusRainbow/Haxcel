@@ -170,18 +170,18 @@ pub extern "stdcall" fn xlAutoOpen() -> i32 {
 
     // register all the functions we are exporting to Excel
     let r = Reg::new();
-    r.add("hxVersion", "Q$", "", "Haxcel", "Displays addin version number as text.", &[]);
-    r.add("hxGHCIVersion", "Q$", "", "Haxcel", "Displays GHCI version number as text.", &[]);
-    r.add("hxRaw", "QQ$", "Command", "Haxcel", "Submits raw text into GHCI and returns the result", &[]);
-    r.add("hxRawRead", "Q$", "", "Haxcel", "Returns any raw text that is ready from GHCI", &[]);
-    r.add("hxRawError", "Q$", "", "Haxcel", "Returns any raw error text that is ready from GHCI", &[]);
-    r.add("hxRawWrite", "QQ$", "Command", "Haxcel", "Submits raw text into GHCI and returns the result", &[]);
-    r.add("hxRawReturn", "Q$", "", "Haxcel", "Submits a raw carriage return into GHCI", &[]);
-    r.add("hxRawWaitRead", "Q$", "", "Haxcel", "Waits for then returns raw text from GHCI", &[]);
-    r.add("hxLoggingOn", "Q$", "", "Haxcel", "Turns on logging", &[]);
-    r.add("hxLoggingOff", "Q$", "", "Haxcel", "Turns off logging", &[]);
-    r.add("hxAssign", "QQQQQQQQQ$", "Name, Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Gets Haskell to assign the variable, then returns its name", &[]);
-    r.add("hxShow", "QQQQQQQQ$", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Shows in as many cells as are needed the result of a Haskell expression", &[]);
+    r.add("hxVersion", "Q", "", "Haxcel", "Displays addin version number as text.", &[]);
+    r.add("hxGHCIVersion", "Q", "", "Haxcel", "Displays GHCI version number as text.", &[]);
+    r.add("hxRaw", "QQ", "Command", "Haxcel", "Submits raw text into GHCI and returns the result", &[]);
+    r.add("hxRawRead", "Q", "", "Haxcel", "Returns any raw text that is ready from GHCI", &[]);
+    r.add("hxRawError", "Q", "", "Haxcel", "Returns any raw error text that is ready from GHCI", &[]);
+    r.add("hxRawWrite", "QQ", "Command", "Haxcel", "Submits raw text into GHCI and returns the result", &[]);
+    r.add("hxRawReturn", "Q", "", "Haxcel", "Submits a raw carriage return into GHCI", &[]);
+    r.add("hxRawWaitRead", "Q", "", "Haxcel", "Waits for then returns raw text from GHCI", &[]);
+    r.add("hxLoggingOn", "Q", "", "Haxcel", "Turns on logging", &[]);
+    r.add("hxLoggingOff", "Q", "", "Haxcel", "Turns off logging", &[]);
+    r.add("hxAssign", "QQQQQQQQQ", "Name, Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Gets Haskell to assign the variable, then returns its name", &[]);
+    r.add("hxShow", "QQQQQQQQ", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Shows in as many cells as are needed the result of a Haskell expression", &[]);
 
     1
 }
