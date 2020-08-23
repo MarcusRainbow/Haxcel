@@ -19,14 +19,8 @@ pub fn assign(name: &str, value: &str) -> String {
     }
 }
 
+/// Returns a variant that contains the value
 pub fn show(value: &str, dim: (usize, usize)) -> Variant {
-
-    log(&format!("show: dim={:?}", dim));
-
-    // if this is not an array formula or a single cell, treat the same as display
-    if dim.0 == 0 || dim.1 == 0 {
-        return Variant::from_str(&display(value))
-    }
 
     // we first assign the result of the expression to a temp variable
     // (maybe be a bit cleverer about the name, but it makes sense to
@@ -39,7 +33,7 @@ pub fn show(value: &str, dim: (usize, usize)) -> Variant {
     if let Some(result) = read_full_response() {
         if ! result.is_empty() {
             // the result should be empty, but if it's not, return it
-            log(&format!("imcomplete result: {}", result));
+            log(&format!("incomplete result: {}", result));
             return Variant::from_str(&result)
         }
     } else {
@@ -64,7 +58,6 @@ pub fn show(value: &str, dim: (usize, usize)) -> Variant {
     // The results here might be something like "hk_temp :: (Num a, Enum a) => [a]"
     // or hk_temp :: [Integer]. We can tell whether this is a list or list of lists
     // by popping ] characters off the end.
-    log(&format!("type string = '{}'", result_type));
     let mut type_iter = result_type.chars().rev();
     if type_iter.next().unwrap() == ']' {
         if type_iter.next().unwrap() == ']' {
@@ -78,26 +71,19 @@ pub fn show(value: &str, dim: (usize, usize)) -> Variant {
 }
 
 fn show_single(var: &str) -> Variant {
-    Variant::from_str(&display(var))
+    Variant::from_str(&execute_command(&format!("{}\n", var)))
 }
 
 fn show_list(var: &str, dim: (usize, usize)) -> Variant {
     let cols = if dim.0 > 1 {dim.0} else {dim.1};
     if cols == 0 {
-        return Variant::from_str("Error: cannot show empty list")
+        return Variant::from_str("Error: destination of formula has zero size")
     }
+    let value = format!("take {} {}\n", cols, var);
+    let list = execute_command(&value).trim().to_string();
+    let trimmed = trim_brackets(&list);
 
-    let value = format!("take {} {}", cols, var);
-    let mut list = display(&value).trim().to_string();
-
-    // remove first and last characters, which should be []
-    let last = list.pop();
-    let first = list.remove(0);
-    if last != Some(']') || first != '[' {
-        return Variant::from_str("Error: list is not surrounded by []")
-    }
-
-    let result_strings: Vec<&str> = list.split(',').collect();
+    let result_strings: Vec<&str> = trimmed.split(',').collect();
     if result_strings.is_empty() {
         return Variant::missing()
     }
@@ -107,20 +93,34 @@ fn show_list(var: &str, dim: (usize, usize)) -> Variant {
         results.push(Variant::from_str(result));
     }
 
-    // for now, just return the first element of the list
     return Variant::from_array(dim.0, dim.1, &results)
 }
 
-fn show_list_of_lists(_var: &str, dim: (usize, usize)) -> Variant {
-    let (cols, rows) = dim;
-    if cols == 0 || rows == 0 {
-        return Variant::from_str("Error: cannot show empty list")
+fn show_list_of_lists(var: &str, dim: (usize, usize)) -> Variant {
+    if dim.0 == 0 || dim.1 == 0 {
+        return Variant::from_str("Error: destination of formula has zero size")
     }
-    return Variant::from_str("show_list_of_lists: TODO")
+    let value = format!("take {} (map (take {}) {})\n", dim.1, dim.0, var);
+    let list = execute_command(&value).trim().to_string();
+
+    let result_strings: Vec<&str> = list.split(',').collect();
+    if result_strings.is_empty() {
+        return Variant::missing()
+    }
+
+    let mut results = Vec::with_capacity(dim.0 * dim.1);
+    for result in result_strings {
+        results.push(Variant::from_str(trim_brackets(result)));
+    }
+
+    return Variant::from_array(dim.0, dim.1, &results)
 }
 
-pub fn display(value: &str) -> String {
-    let command = format!("{}\n", value);
+fn trim_brackets(text: &str) -> &str {
+    text.trim_start_matches('[').trim_end_matches(']')
+}
+
+pub fn execute_command(command: &str) -> String {
     if ! write_pipe(&command) {
         return error_message("Error: Cannot write to Haskell")
     }

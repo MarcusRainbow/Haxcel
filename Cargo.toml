@@ -1,9 +1,9 @@
 [package]
-name = "hasxcel"
+name = "haxcel"
 version = "0.1.0"
 authors = ["Marcus Rainbow"]
 license = "MIT"
-description = "Hasxcel: Excel gateway to Haskell"
+description = "Haxcel: Excel gateway to Haskell"
 
 [dependencies]
 winapi = { version = "0.3.5", features = [
@@ -14,5 +14,5 @@ winapi = { version = "0.3.5", features = [
 xladd = { path = "../xladd-master" }
 
 [lib]
-name = "hasxcel"
+name = "haxcel"
 crate-type = ["cdylib"]

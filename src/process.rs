@@ -17,6 +17,7 @@ use std::{mem, ptr, thread, time};
 static mut GHCI_STDIN : HANDLE = NULL;
 static mut GHCI_STDOUT : HANDLE = NULL;
 static mut GHCI_STDERR : HANDLE = NULL;
+static mut GHCI_INITIAL_RESPONSE : Option<String> = None;
 static mut LOGGING : bool = false;
 
 pub fn start_ghci() {
@@ -132,7 +133,16 @@ pub fn start_ghci() {
         CloseHandle(child_stdin);
         CloseHandle(child_stdout);
         CloseHandle(child_stderr);
+
+        // pull as much as we can from GHCI. This should be just version info
+        // that GHCI outputs at startup.
+        GHCI_INITIAL_RESPONSE = read_full_response();
     }
+}
+
+pub fn ghci_version() -> String {
+    let ver = unsafe { GHCI_INITIAL_RESPONSE.clone() };
+    ver.unwrap_or_default()
 }
 
 fn stdout_pipe() -> HANDLE {
