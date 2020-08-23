@@ -177,7 +177,7 @@ pub fn log(message: &str) {
     }
 }
 
-fn always_log(message: &str) {
+pub fn always_log(message: &str) {
     let cstr = CString::new(message).unwrap();
     unsafe { OutputDebugStringA(cstr.as_ptr()) };
 }

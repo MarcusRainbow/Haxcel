@@ -1,21 +1,23 @@
 use xladd::variant::Variant;
 use process::{write_pipe, error_message, read_full_response, log};
 
+pub fn load(name: &str) -> String {
+    let command = format!(":l {}\n", name);
+    execute_command(&command)
+}
+
+pub fn reload() -> String {
+    execute_command(":r\n")
+}
+
 pub fn assign(name: &str, value: &str) -> String {
     let command = format!("{} = {}\n", name, value);
-    if ! write_pipe(&command) {
-        return error_message("Error: Cannot write to Haskell")
-    }
-
-    if let Some(result) = read_full_response() {
-        if result.is_empty() {
-            // this is what we expect. Successful assignment does not output anything
-            return name.to_string()
-        } else {
-            return result   // error message or whatever -- just send it back to the user
-        }
+    let response = execute_command(&command);
+    if response.is_empty() {
+        // this is what we expect. Successful assignment does not output anything
+        return name.to_string()
     } else {
-        return error_message("Error: Cannot read from Haskell")
+        return response   // error message or whatever -- just send it back to the user
     }
 }
 
@@ -27,17 +29,10 @@ pub fn show(value: &str, dim: (usize, usize)) -> Variant {
     // reuse the same name, so results get garbage collected).
     let temp = "hk_temp";
     let command = format!("{} = {}\n", temp, value);
-    if ! write_pipe(&command) {
-        return Variant::from_str(&error_message("Error: Cannot write to Haskell"))
-    }
-    if let Some(result) = read_full_response() {
-        if ! result.is_empty() {
-            // the result should be empty, but if it's not, return it
-            log(&format!("incomplete result: {}", result));
-            return Variant::from_str(&result)
-        }
-    } else {
-        return Variant::from_str(&error_message("Error: Cannot read from Haskell"))
+    let response = execute_command(&command);
+    if ! response.is_empty() {
+        // Successful assignment does not output anything. If there was anything there, send it as an error
+        return Variant::from_str(&response)
     }
 
     // now take a peek at the type of the result

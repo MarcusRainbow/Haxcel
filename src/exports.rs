@@ -5,13 +5,14 @@
 //! We implement xlAutoOpen here, because it needs to register our exported
 //! functions. Other xlAuto methods are exported by xladd.
 
+use xladd::xlcall::xlGetName;
 use xladd::variant::Variant;
 use xladd::xlcall::{LPXLOPER12, xlfCaller};
 use xladd::registrator::Reg;
 use xladd::entrypoint::excel12;
 use process::{start_ghci, ghci_version, raw_command, raw_read, 
-    raw_error, raw_write, raw_wait_read, raw_return, logging};
-use haskell::{assign, show};
+    raw_error, raw_write, raw_wait_read, raw_return, logging, always_log};
+use haskell::{assign, show, load, reload};
 
 /// Shows version string. Note that in the Excel function wizard, this shows
 /// as requiring one unnamed parameter. This is a longstanding Excel bug.
@@ -122,6 +123,27 @@ pub extern "stdcall" fn hxAssign(
 }
 
 #[no_mangle]
+pub extern "stdcall" fn hxLoad(xl_module: LPXLOPER12) -> LPXLOPER12 {
+    let result;
+    if let Some(module) = Variant::from_xloper(xl_module).as_string() {
+        result = load(&module);
+        
+    } else {
+        result = "Error: args must be strings".to_string();
+    }
+
+    let box_result = Box::new(Variant::from_str(&result));
+    Box::into_raw(box_result) as LPXLOPER12
+}
+
+#[no_mangle]
+pub extern "stdcall" fn hxReload() -> LPXLOPER12 {
+    let result = reload();
+    let box_result = Box::new(Variant::from_str(&result));
+    Box::into_raw(box_result) as LPXLOPER12
+}
+
+#[no_mangle]
 pub extern "stdcall" fn hxShow(
         xl_expr: LPXLOPER12,
         xl_arg0: LPXLOPER12,
@@ -180,6 +202,8 @@ pub extern "stdcall" fn xlAutoOpen() -> i32 {
     r.add("hxRawWaitRead", "Q", "", "Haxcel", "Waits for then returns raw text from GHCI", &[]);
     r.add("hxLoggingOn", "Q", "", "Haxcel", "Turns on logging", &[]);
     r.add("hxLoggingOff", "Q", "", "Haxcel", "Turns off logging", &[]);
+    r.add("hxLoad", "QQ", "", "Haxcel", "Loads a Haskell module", &[]);
+    r.add("hxReload", "Q", "", "Haxcel", "Reloads all Haskell modules and clears all variables", &[]);
     r.add("hxAssign", "QQQQQQQQQ", "Name, Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Gets Haskell to assign the variable, then returns its name", &[]);
     r.add("hxShow", "QQQQQQQQ", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Shows in as many cells as are needed the result of a Haskell expression", &[]);
 
