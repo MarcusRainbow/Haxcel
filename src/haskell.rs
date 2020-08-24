@@ -21,9 +21,24 @@ pub fn assign(name: &str, value: &str) -> String {
     }
 }
 
-/// Returns a variant that contains the value
+/// Returns a variant that contains the value as a string
 pub fn show(value: &str, dim: (usize, usize)) -> Variant {
+    eval_show(value, dim, Variant::from_str)
+}
 
+/// Returns a variant that contains the value as a floating point
+/// number if possible.
+pub fn eval(value: &str, dim: (usize, usize)) -> Variant {
+    eval_show(value, dim, |s| {
+        if let Ok(value) = s.parse::<f64>() {
+            Variant::from_float(value)
+        } else {
+            Variant::from_str(s)
+        }
+    })
+}
+
+fn eval_show(value: &str, dim: (usize, usize), make_var: fn (&str) -> Variant) -> Variant {
     // we first assign the result of the expression to a temp variable
     // (maybe be a bit cleverer about the name, but it makes sense to
     // reuse the same name, so results get garbage collected).
@@ -56,20 +71,16 @@ pub fn show(value: &str, dim: (usize, usize)) -> Variant {
     let mut type_iter = result_type.chars().rev();
     if type_iter.next().unwrap() == ']' {
         if type_iter.next().unwrap() == ']' {
-            show_list_of_lists(temp, dim)
+            show_list_of_lists(temp, dim, make_var)
         } else {
-            show_list(temp, dim)
+            show_list(temp, dim, make_var)
         }
     } else {
-        show_single(temp)
+        make_var(&execute_command(&format!("{}\n", temp)))
     }
 }
 
-fn show_single(var: &str) -> Variant {
-    Variant::from_str(&execute_command(&format!("{}\n", var)))
-}
-
-fn show_list(var: &str, dim: (usize, usize)) -> Variant {
+fn show_list(var: &str, dim: (usize, usize), make_var: fn (&str) -> Variant) -> Variant {
     let cols = if dim.0 > 1 {dim.0} else {dim.1};
     if cols == 0 {
         return Variant::from_str("Error: destination of formula has zero size")
@@ -85,13 +96,13 @@ fn show_list(var: &str, dim: (usize, usize)) -> Variant {
 
     let mut results = Vec::with_capacity(cols);
     for result in result_strings {
-        results.push(Variant::from_str(result));
+        results.push(make_var(result));
     }
 
     return Variant::from_array(dim.0, dim.1, &results)
 }
 
-fn show_list_of_lists(var: &str, dim: (usize, usize)) -> Variant {
+fn show_list_of_lists(var: &str, dim: (usize, usize), make_var: fn (&str) -> Variant) -> Variant {
     if dim.0 == 0 || dim.1 == 0 {
         return Variant::from_str("Error: destination of formula has zero size")
     }
@@ -105,7 +116,7 @@ fn show_list_of_lists(var: &str, dim: (usize, usize)) -> Variant {
 
     let mut results = Vec::with_capacity(dim.0 * dim.1);
     for result in result_strings {
-        results.push(Variant::from_str(trim_brackets(result)));
+        results.push(make_var(trim_brackets(result)));
     }
 
     return Variant::from_array(dim.0, dim.1, &results)

@@ -32,13 +32,13 @@ hxAssign returns the name (the first arg), in the case of success. This makes it
 
 The expression in hxAssign (the second arg) can contain embedded references to other variables, specified as "{}" as in Rust or Python. Eventually, we shall support format specifiers inside the braces, but not yet. These refer to the third and subsequent args, which means you can easily maintain the dependency structure of your Haskell definitions.
 
-### hxShow
+### hxExec
 
 ```Excel
-=hxShow("add_three_cells + {} + {} + {}", B1, B2, B3)
+=hxExec("add_three_cells + {} + {} + {}", B1, B2, B3)
 ```
 
-hxShow allows you to show inside Excel the result of a Haskell calculation. If the calculation simply returns a scalar or a string, this is the return value of hxShow and appears in the cell. If the calculation errored out, the error message appears in the cell.
+hxExec allows you to show inside Excel the result of a Haskell calculation. If the calculation simply returns a scalar or a string, this is the return value of hxExec and appears in the cell. If the calculation errored out, the error message appears in the cell.
 
 As with hxAssign, you can embed "{}" arguments in the expression.
 

@@ -12,7 +12,7 @@ use xladd::registrator::Reg;
 use xladd::entrypoint::excel12;
 use process::{start_ghci, ghci_version, raw_command, raw_read, 
     raw_error, raw_write, raw_wait_read, raw_return, logging, always_log};
-use haskell::{assign, show, load, reload};
+use haskell::{assign, show, eval, load, reload};
 
 /// Shows version string. Note that in the Excel function wizard, this shows
 /// as requiring one unnamed parameter. This is a longstanding Excel bug.
@@ -167,6 +167,30 @@ pub extern "stdcall" fn hxShow(
     Box::into_raw(box_result) as LPXLOPER12
 }
 
+#[no_mangle]
+pub extern "stdcall" fn hxEval(
+        xl_expr: LPXLOPER12,
+        xl_arg0: LPXLOPER12,
+        xl_arg1: LPXLOPER12,
+        xl_arg2: LPXLOPER12,
+        xl_arg3: LPXLOPER12,
+        xl_arg4: LPXLOPER12,
+        xl_arg5: LPXLOPER12) -> LPXLOPER12 {
+    let result;
+    if let Some(expr) = Variant::from_xloper(xl_expr).as_string() {
+        let expression = unpack_args(expr, &[xl_arg0, xl_arg1, xl_arg2, xl_arg3, xl_arg4, xl_arg5]);
+
+        // find out the dimensions of the array formula (if any) that invoked us
+        let caller = excel12(xlfCaller, &mut []);
+        result = eval(&expression, caller.dim());
+    } else {
+        result = Variant::from_str("Error: args must be strings");
+    }
+
+    let box_result = Box::new(result);
+    Box::into_raw(box_result) as LPXLOPER12
+}
+
 fn unpack_args(expr : String, xl_args: &[LPXLOPER12]) -> String {
     let mut result = String::new();
     let mut arg = 0;
@@ -205,7 +229,8 @@ pub extern "stdcall" fn xlAutoOpen() -> i32 {
     r.add("hxLoad", "QQ", "", "Haxcel", "Loads a Haskell module", &[]);
     r.add("hxReload", "Q", "", "Haxcel", "Reloads all Haskell modules and clears all variables", &[]);
     r.add("hxAssign", "QQQQQQQQQ", "Name, Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Gets Haskell to assign the variable, then returns its name", &[]);
-    r.add("hxShow", "QQQQQQQQ", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Shows in as many cells as are needed the result of a Haskell expression", &[]);
+    r.add("hxEval", "QQQQQQQQ", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Evaluates a Haskell expression and writes it, numerically if possible, to the given cells", &[]);
+    r.add("hxShow", "QQQQQQQQ", "Expression, Arg, Arg, Arg, Arg, Arg", "Haxcel", "Evaluates a Haskell expression and writes it as strings to the given cells", &[]);
 
     1
 }
