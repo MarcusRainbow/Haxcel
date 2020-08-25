@@ -2,6 +2,15 @@
 
 An addin for running Haskell within Excel.
 
+## Motivation
+
+In some senses, Excel is a funtional language. Functions in cells generally do not have side-effects. Flow of control expressions such as IF are functions, as is everything else. However, some things are missing, and for these, an embedded genuinely functional language such as Haskell is helpful. Moreover, because Excel is itself partly functional, Haskell embeds in a really natural way, so you can easily use both Excel and Haskell functions together in the same sheet.
+
+* In Haxcel, functions are first-class objects, so you can create a function at runtime, store it in an Excel cell and pass it to other funtions.
+* In Haxcel, function calls are non-strict, which makes it possible to handle infinitely recursive functions and infinite lists. The functions are only evaluated to the extent that they fill the cells the user wants them to fill, and they are only evaluated when they are needed.
+* Haxcel allows you to load and compile Haskell modules, which opens the possibility of really high-performance computing in a spreadsheet. It also allows you to use Haskell libraries, for specialised tasks such as financial maths.
+* Haxcel optionally works with floating point numbers, which interface well with native Excel, or strings, which support Haskell types such as Integer (integers of unlimited size), Rational (exact representation of rational numbers), Complex etc.
+
 ## How it works
 
 GHCI is the command-line interpreter for Glasgow Haskell. From the command line you can execute Haskell code, control the Haskell environment and load/reload/unload modules. It is possible to assign values, functions and other data structures to labels, which can be used in future command line actions.
@@ -47,7 +56,7 @@ Where things get clever is if the expression returns a list or a list of lists. 
 For example, you could write:
 
 ```Excel
-=hxShow("ints_from 0 where ints_from n = [n..] : (ints_from (n+1))")
+=hxExec("ints_from 0 where ints_from n = [n..] : (ints_from (n+1))")
 ```
 
 This expression returns an infinite list of infinite lists. If you invoke this expression as an array formula (Ctrl+Shift+Enter) in a 3x4 range of cells, it actually invokes:
@@ -65,3 +74,16 @@ This makes it harder to call something in Haskell that will never return. Though
 The functions for this are hxLoad and hxReload, which map to ":l" and ":r" in GHCI. The current directory is defined in your Excel settings, typically the "Documents" directory, so you probably want to supply a full path to the Haskell file to be loaded.
 
 Be careful with dependencies. The sample Excel file, test.xlsx, shows one way to ensure a module is loaded before the functions it defines are invoked.
+
+### Some other functions
+
+| Function      | Args           | Behaviour  |
+| ------------- |--------------- | ---------- |
+| hxShow        | value, args... | Same as hxExec except it always writes strings |
+| hxRaw         | command        | Submits a command direct to GHCI and returns the response |
+| hxVersion     |                | Returns version information about Haxcel |
+| hxGHCIVersion |                | Returns version information about GHCI |
+| hxLoggingOn   |                | Turns on logging to OutputDebugString (use DebugView to view it) |
+| hxLoggingOff  |                | Turns off logging |
+
+There are also functions for just reading or writing from GHCI, but these should be treated with extreme care, as they can leave GHCI in an unstable state, or hang waiting for ever.

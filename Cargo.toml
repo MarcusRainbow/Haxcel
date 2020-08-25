@@ -4,14 +4,18 @@ version = "0.1.0"
 authors = ["Marcus Rainbow"]
 license = "MIT"
 description = "Haxcel: Excel gateway to Haskell"
+documentation = "https://github.com/MarcusRainbow/Haxcel/README.md"
+repository = "https://github.com/MarcusRainbow/Haxcel"
+keywords = ["Excel", "Haskell"]
+categories = ["mathematics", "science"]
 
 [dependencies]
 winapi = { version = "0.3.5", features = [
     "winuser", "libloaderapi", "debugapi", "processthreadsapi", "handleapi", 
     "namedpipeapi", "winbase", "fileapi", "errhandlingapi", "wincon",
     ] }
-#xladd = "0.1.2"
-xladd = { path = "../xladd-master" }
+xladd = "0.1.2"
+#xladd = { path = "../xladd-master" }
 
 [lib]
 name = "haxcel"
