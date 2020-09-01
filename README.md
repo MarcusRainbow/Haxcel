@@ -4,7 +4,7 @@ An addin for running Haskell within Excel.
 
 ## Motivation
 
-In some senses, Excel is a funtional language. Functions in cells generally do not have side-effects. Flow of control expressions such as IF are functions, as is everything else. However, some things are missing, and for these, an embedded genuinely functional language such as Haskell is helpful. Moreover, because Excel is itself partly functional, Haskell embeds in a really natural way, so you can easily use both Excel and Haskell functions together in the same sheet.
+In some senses, Excel is a functional language. Functions in cells generally do not have side-effects. Flow of control expressions such as IF are functions, as is everything else. However, some things are missing, and for these, an embedded genuinely functional language such as Haskell is helpful. Moreover, because Excel is itself partly functional, Haskell embeds in a really natural way, so you can easily use both Excel and Haskell functions together in the same sheet.
 
 * In Haxcel, functions are first-class objects, so you can create a function at runtime, store it in an Excel cell and pass it to other funtions.
 * In Haxcel, function calls are non-strict, which makes it possible to handle infinitely recursive functions and infinite lists. The functions are only evaluated to the extent that they fill the cells the user wants them to fill, and they are only evaluated when they are needed.
@@ -15,7 +15,7 @@ In some senses, Excel is a funtional language. Functions in cells generally do n
 
 GHCI is the command-line interpreter for Glasgow Haskell. From the command line you can execute Haskell code, control the Haskell environment and load/reload/unload modules. It is possible to assign values, functions and other data structures to labels, which can be used in future command line actions.
 
-This addin launches GHCI in a separate process, but controlling its stdin and stdout. This means that from within Excel, we can pass commands to Haskell, assigning and storing values, functions etc, which can then be used from other cells.
+This addin launches GHCI in a separate process, but controlling its stdin and stdout. This means that from within Excel, we can pass commands to Haskell, assigning and storing values, functions etc, which can then be used from other cells. In the unlikely event of Haskell crashing, it will not bring down Excel. Something I am working on is the ability to interrupt a slow-running or infinite Haskell function, so that Excel can continue and Haskell can be restarted.
 
 ## How to use it
 
@@ -35,9 +35,9 @@ What this means is that you have to be careful to get the inter-cell dependencie
 
 hxAssign allows you to assign a name to a Haskell expression. The expression can be a number, string, list or a function -- anything that Haskell can assign a name to. The function is typically not evaluated unless it is marked as strict. Thus it is perfectly legal to write something like hxAssign("all_positive_integers", "[0..]"). This would take forever to execute as it stands, but non-strict evaluation means only as much of it is evaluated as is needed, when it is needed.
 
-You can use hxAssign to define functions, but the definition must be of the form label = expression. This means functions must be defined using lambda expressions. (We may add syntactic sugar methods to haxcel to support function definition in prettier ways.)
+You can use hxAssign to define functions, but the definition must be of the form label = expression. This means functions must be defined using lambda expressions. (We may add syntactic sugar methods to Haxcel to support function definition in prettier ways.)
 
-hxAssign returns the name (the first arg), in the case of success. This makes it easy to chain dependencies in a natural way. Note that Excel does not support cyclic dependency structures, as you could get with corecursion in Haskell. In the case of error, it returns whatever error GHCI wrote, as a string.
+hxAssign returns the name (the first arg), in the case of success. This makes it easy to chain dependencies in a natural way. Note that Excel does not support cyclic dependency structures, as you could get with mutual recursion in Haskell. Mutual recursion can be set up in modules loaded into Excel, or by using string labels to break the dependecy cycles. In the case of error, hxAssign returns whatever error GHCI returned, as a string.
 
 The expression in hxAssign (the second arg) can contain embedded references to other variables, specified as "{}" as in Rust or Python. Eventually, we shall support format specifiers inside the braces, but not yet. These refer to the third and subsequent args, which means you can easily maintain the dependency structure of your Haskell definitions.
 
@@ -86,4 +86,4 @@ Be careful with dependencies. The sample Excel file, test.xlsx, shows one way to
 | hxLoggingOn   |                | Turns on logging to OutputDebugString (use DebugView to view it) |
 | hxLoggingOff  |                | Turns off logging |
 
-There are also functions for just reading or writing from GHCI, but these should be treated with extreme care, as they can leave GHCI in an unstable state, or hang waiting for ever.
+There are also functions for just writing to GHCI, or reading its stdout or stderr streams, but these should be treated with extreme care, as they can leave GHCI in an unstable state, or hang waiting for ever.
