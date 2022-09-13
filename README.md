@@ -87,3 +87,17 @@ Be careful with dependencies. The sample Excel file, test.xlsx, shows one way to
 | hxLoggingOff  |                | Turns off logging |
 
 There are also functions for just writing to GHCI, or reading its stdout or stderr streams, but these should be treated with extreme care, as they can leave GHCI in an unstable state, or hang waiting for ever.
+
+## Installing Haxcel
+
+Haxcel is written in Rust, and runs in Excel in Win64. (It may also run in 32bit Windows, but I have not tested that combination.) You therefore need a 64bit Windows machine with Microsoft Office. You also need a Win64 version of the Glasgow Haskell Compiler (GHC). Specifically, Haxcel uses GHCi in an interactive session, connecting with Windows Pipes.
+
+Install Rust for a Win64 environment (i.e. not Windows Subsystem Linux), including cargo.
+
+Haxcel depends on a number of other Rust projects (see the Cargo.toml file for details), but these should automatically install. You may need to install xladd manually, from this Git account. Again, this is a Rust project, with its own cargo file.
+
+Build Haxcel (and if necessary xladd) by running "cargo build install" from the directory containing Cargo.toml. The result of the build is a file Haxcel.dll. Where this ends up will depend on whether you build in debug or release, and what you call the directory containing Haxcel, but for example it may end up in "Haxcel\target\debug".
+
+One way to load it is to first load the sample spreadsheet, tests.xlsx. If you hit f9 to recalculate, you will see lots of error messages, as Haxcel is not loaded. Now load the dll by typing its full path into the File Open dialog. Excel will recognise that you are loading an unsigned Excel addin, and will warn you about the security risks. Override these and Excel will load Haxcel, and also start GHCi and connect Excel to GHCi using pipes.
+
+Now you can recalculate the spreadsheet, by selecting each cell and hitting f2 Enter, or by hitting f9 to recalculate the whole spreadsheet. You should see the correct calculation. 
